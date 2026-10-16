@@ -5,7 +5,7 @@ using MelonLoader;
 using PalletPaste.SpawnGun;
 using UnityEngine;
 
-[assembly: MelonInfo(typeof(PalletPaste.Core), "PalletPaste", "2.0.0", "Fizzyhex", null)]
+[assembly: MelonInfo(typeof(PalletPaste.Core), "PalletPaste", "2.0.1", "Fizzyhex", null)]
 [assembly: MelonColor(alpha: 255, red: 20, green: 194, blue: 215)]
 [assembly: MelonAuthorColor(alpha: 255, red: 108, green: 116, blue: 230)]
 [assembly: MelonAdditionalDependencies("LabFusion")]

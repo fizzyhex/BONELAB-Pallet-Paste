@@ -1,7 +1,10 @@
 ﻿using BoneLib.Notifications;
+using Il2CppSLZ.Bonelab;
+using Il2CppSLZ.UI;
 using LabFusion.Downloading.ModIO;
 using LabFusion.Downloading;
 using MelonLoader;
+using DateTime = Il2CppSystem.DateTime;
 
 namespace PalletPaste
 {
@@ -67,12 +70,29 @@ namespace PalletPaste
                 MelonLogger.Msg(transaction.Result == ModResult.FAILED ? "Download failed!" : "Download succeeded!");
                 MelonLogger.Msg($"Pallet: {transaction.Pallet.Title} ({transaction.Pallet.Barcode.ID}) by @{transaction.Pallet.Author}");
                 MelonLogger.Msg("Crates:");
-
+                
                 foreach (var crate in transaction.Pallet.Crates)
                 {
                     MelonLogger.Msg($"- {crate.Title} ({crate.Barcode.ID})");
                     crate.Tags.Add("<color=#07f5f5>Pallet Paste</color>");
                 }
+
+                var palletView = BoneLib.Player.UIRig?.popUpMenu?.spawnablesPanelView;
+
+                if (!palletView)
+                {
+                    return;
+                }
+
+                // brings the pallet to the top of the sort
+                palletView.palletInstalledDates[transaction.Pallet] = DateTime.Now;
+                
+                palletView.GenerateCategoriesMapping();
+                // refresh visible buttons, required when new tags are added
+                palletView.PopulateMenu(); // also calls FilterTagTree()
+                
+                // re-draw the current tab
+                palletView.SelectTab(palletView._selectedTabIndex);
             }
         }
 
