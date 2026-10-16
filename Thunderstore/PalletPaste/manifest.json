@@ -1,6 +1,6 @@
 {
     "name": "PalletPaste",
-    "version_number": "2.1.0",
+    "version_number": "2.1.1",
     "website_url": "https://github.com/Fizzyhex/BONELAB-Pallet-Paste",
     "description": "Install Mod.io mods from your clipboard at runtime, via Fusion's downloader.",
     "dependencies": [

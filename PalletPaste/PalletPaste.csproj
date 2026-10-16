@@ -13,6 +13,8 @@
 		<LangVersion>latest</LangVersion>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<DoNotCopyLocalIfInGac>true</DoNotCopyLocalIfInGac>
+		<!-- local clone of BONELAB-Fusion; override with -p:FUSION_DIR=... or a FUSION_DIR env var -->
+		<FUSION_DIR Condition="'$(FUSION_DIR)' == ''">..\..\BONELAB-Fusion</FUSION_DIR>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -209,7 +211,7 @@
 		  <HintPath>$(BONELAB_DIR)\Mods\LabFusion.dll</HintPath>
 		</Reference>
         <Reference Include="BonelabSupport">
-          <HintPath>..\..\BONELAB-Fusion\LabFusion\SupportModules\BonelabSupport.dll</HintPath>
+          <HintPath>$(FUSION_DIR)\LabFusion\SupportModules\BonelabSupport.dll</HintPath>
         </Reference>
 		<Reference Include="Newtonsoft.Json">
 		  <HintPath>$(BONELAB_DIR)\MelonLoader\Dependencies\Il2CppAssemblyGenerator\Cpp2IL\cpp2il_out\Newtonsoft.Json.dll</HintPath>
@@ -566,7 +568,8 @@
 	</ItemGroup>
 	
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="COPY &quot;$(TargetPath)&quot; &quot;$(BONELAB_DIR)\Mods&quot;" />
+		<!-- GitHub Actions sets CI=true; don't overwrite the installed mod during release builds -->
+		<Exec Command="COPY &quot;$(TargetPath)&quot; &quot;$(BONELAB_DIR)\Mods&quot;" Condition="'$(CI)' != 'true'" />
 		<Exec Command="COPY &quot;$(TargetPath)&quot; &quot;$(SolutionPath)\..\Thunderstore\PalletPaste&quot;" />
 	</Target>
 </Project>

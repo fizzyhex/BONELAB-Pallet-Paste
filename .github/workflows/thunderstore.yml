@@ -1,0 +1,160 @@
+name: Publish to Thunderstore
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Upload to Thunderstore (leave unticked to only build and package)
+        type: boolean
+        default: false
+
+concurrency:
+  group: thunderstore
+  cancel-in-progress: false
+
+permissions:
+  contents: write # attach the package zip to the GitHub release
+
+jobs:
+  publish:
+    # The build references BONELAB's MelonLoader assemblies and a local BONELAB-Fusion clone,
+    # so it has to run on a self-hosted runner on the dev machine.
+    runs-on: [self-hosted, Windows]
+    if: github.event_name != 'release' || !github.event.release.prerelease
+    defaults:
+      run:
+        shell: powershell
+    env:
+      PACKAGE_DIR: Thunderstore\PalletPaste
+      TCLI_VERSION: 0.2.4
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content "$env:PACKAGE_DIR\manifest.json" -Raw | ConvertFrom-Json).version_number
+
+          if ($env:GITHUB_EVENT_NAME -eq 'release') {
+            $tagVersion = $env:TAG -replace '^v', ''
+            if ($tagVersion -ne $version) {
+              throw "Release tag '$env:TAG' does not match manifest.json version_number '$version'."
+            }
+          }
+
+          if (-not (Select-String -Path PalletPaste\Core.cs -SimpleMatch "`"PalletPaste`", `"$version`"" -Quiet)) {
+            throw "MelonInfo version in PalletPaste\Core.cs does not match manifest.json version_number '$version'."
+          }
+
+          # collect this version's section of the changelog, up to the next '## ' heading
+          $notes = @()
+          $inSection = $false
+          foreach ($line in Get-Content "$env:PACKAGE_DIR\CHANGELOG.md") {
+            if ($line -match '^## ') {
+              if ($inSection) { break }
+              $inSection = $line.Trim() -eq "## $version"
+              continue
+            }
+            if ($inSection) { $notes += $line }
+          }
+          $notes = ($notes -join "`n").Trim()
+          if (-not $notes) {
+            throw "CHANGELOG.md has no '## $version' section (or it is empty)."
+          }
+
+          $notesFile = Join-Path $env:RUNNER_TEMP 'release-notes.md'
+          [IO.File]::WriteAllText($notesFile, "$notes`n")
+          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "version=$version`nnotes=$notesFile`n")
+          Write-Host "Version: $version"
+          Write-Host $notes
+
+      - name: Check build paths
+        env:
+          BONELAB_DIR_OVERRIDE: ${{ vars.BONELAB_DIR }}
+          FUSION_DIR_OVERRIDE: ${{ vars.FUSION_DIR }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # repository variables take priority over the runner's environment
+          if ($env:BONELAB_DIR_OVERRIDE) { $env:BONELAB_DIR = $env:BONELAB_DIR_OVERRIDE }
+          if ($env:FUSION_DIR_OVERRIDE) { $env:FUSION_DIR = $env:FUSION_DIR_OVERRIDE }
+
+          if (-not $env:BONELAB_DIR -or -not (Test-Path "$env:BONELAB_DIR\MelonLoader\Il2CppAssemblies")) {
+            throw "BONELAB_DIR ('$env:BONELAB_DIR') is not a BONELAB install with MelonLoader assemblies."
+          }
+          if (-not $env:FUSION_DIR -or -not (Test-Path "$env:FUSION_DIR\LabFusion\SupportModules\BonelabSupport.dll")) {
+            throw "FUSION_DIR ('$env:FUSION_DIR') is not a BONELAB-Fusion clone with BonelabSupport.dll built."
+          }
+
+          [IO.File]::AppendAllText($env:GITHUB_ENV, "BONELAB_DIR=$env:BONELAB_DIR`nFUSION_DIR=$env:FUSION_DIR`n")
+
+      - name: Build
+        run: dotnet build PalletPaste.sln -c Release
+
+      - name: Package
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $stage = Join-Path $env:RUNNER_TEMP 'thunderstore'
+          if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
+          New-Item -ItemType Directory $stage | Out-Null
+
+          Copy-Item -Destination $stage -Path @(
+            'PalletPaste\bin\Release\net6.0\PalletPaste.dll',
+            "$env:PACKAGE_DIR\manifest.json",
+            "$env:PACKAGE_DIR\README.md",
+            "$env:PACKAGE_DIR\CHANGELOG.md",
+            "$env:PACKAGE_DIR\icon.png"
+          )
+
+          $zip = Join-Path $env:RUNNER_TEMP "Fizzyhex-PalletPaste-$env:VERSION.zip"
+          Compress-Archive -Path "$stage\*" -DestinationPath $zip -Force
+          [IO.File]::AppendAllText($env:GITHUB_OUTPUT, "zip=$zip`n")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fizzyhex-PalletPaste-${{ steps.version.outputs.version }}
+          path: ${{ steps.package.outputs.zip }}
+
+      - name: Attach to GitHub release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+          ZIP: ${{ steps.package.outputs.zip }}
+          NOTES: ${{ steps.version.outputs.notes }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release upload "$env:TAG" "$env:ZIP" --clobber --repo "$env:GITHUB_REPOSITORY"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+          # fill in the release description from CHANGELOG.md, unless one was written by hand
+          if ([string]::IsNullOrWhiteSpace($env:RELEASE_BODY)) {
+            gh release edit "$env:TAG" --notes-file "$env:NOTES" --repo "$env:GITHUB_REPOSITORY"
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+
+      - name: Publish to Thunderstore
+        if: github.event_name == 'release' || inputs.publish
+        env:
+          TCLI_AUTH_TOKEN: ${{ secrets.THUNDERSTORE_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ZIP: ${{ steps.package.outputs.zip }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:TCLI_AUTH_TOKEN) { throw "THUNDERSTORE_TOKEN secret is not set." }
+
+          $toolPath = Join-Path $env:RUNNER_TEMP 'tcli'
+          dotnet tool install tcli --version $env:TCLI_VERSION --tool-path $toolPath
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+          & "$toolPath\tcli.exe" publish --config-path Thunderstore\thunderstore.toml --file $env:ZIP --package-version $env:VERSION
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

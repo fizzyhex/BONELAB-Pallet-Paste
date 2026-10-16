@@ -19,5 +19,3 @@ Copy Mod.io links to your clipboard and load them into the game at runtime.
 2. Copy it to your clipboard.
 3. Navigate to BoneMenu -> Pallet Paste and click paste.
 4. :D
-
-## Update Log

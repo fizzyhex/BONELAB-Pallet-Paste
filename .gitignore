@@ -364,3 +364,7 @@ FodyWeavers.xsd
 Thunderstore/PalletPaste/PalletPaste.dll
 Thunderstore/*.zip
 Thunderstore/*/*.zip
+Thunderstore/build/
+
+# Local environment variables
+.env

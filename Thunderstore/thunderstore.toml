@@ -1,0 +1,33 @@
+# Thunderstore CLI config, used by the thunderstore GH workflow.
+# The workflow publishes a pre-built zip (--file), so the package metadata that
+# gets pushed comes from PalletPaste/manifest.json
+
+[config]
+schemaVersion = "0.0.1"
+
+[package]
+namespace = "Fizzyhex"
+name = "PalletPaste"
+versionNumber = "0.0.0" # overwritten with --package-version
+description = "Install Mod.io mods from your clipboard at runtime, via Fusion's downloader."
+websiteUrl = "https://github.com/Fizzyhex/BONELAB-Pallet-Paste"
+containsNsfwContent = false
+
+[package.dependencies]
+Lakatrazz-Fusion = "1.13.0"
+
+[build]
+icon = "./PalletPaste/icon.png"
+readme = "./PalletPaste/README.md"
+outdir = "./build"
+
+[[build.copy]]
+source = "./PalletPaste/PalletPaste.dll"
+target = "PalletPaste.dll"
+
+[publish]
+repository = "https://thunderstore.io"
+communities = ["bonelab"]
+
+[publish.categories]
+bonelab = ["mods", "utility"]
