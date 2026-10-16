@@ -85,6 +85,7 @@ namespace PalletPaste
                 }
 
                 // brings the pallet to the top of the sort
+                // note: leaving this as null breaks pallet ordering until level reload!
                 palletView.palletInstalledDates[transaction.Pallet] = DateTime.Now;
                 
                 palletView.GenerateCategoriesMapping();
