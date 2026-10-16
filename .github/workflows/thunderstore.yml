@@ -156,5 +156,5 @@ jobs:
           dotnet tool install tcli --version $env:TCLI_VERSION --tool-path $toolPath
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
-          & "$toolPath\tcli.exe" publish --config-path Thunderstore\thunderstore.toml --file $env:ZIP --package-version $env:VERSION
+          & "$toolPath\tcli.exe" publish --config-path Thunderstore\thunderstore.toml --file $env:ZIP
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
